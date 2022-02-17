@@ -64,7 +64,8 @@ SaS <- function(X, y, U, S = 10000L, a = 1L, b = 1L, A = 1L, B = 1L){
     phi <- rnorm(1, solve(t(U) %*% U) %*% t(U) %*% (y - X %*% beta), sigma2 * solve(t(U) %*% U))
     
     # Sample p(z | Y, phi, r2, q)
-
+    ytil <- y - U * phi
+    g2 <- (1 / (k * q)) * (r2 / (1 - r2))
     for (j in sample(seq_along(z))){
       
       if (!(sum(z) == 1 & z[j] == 1)){
@@ -72,6 +73,13 @@ SaS <- function(X, y, U, S = 10000L, a = 1L, b = 1L, A = 1L, B = 1L){
         zp[j] <- 1 - zp[j]
         probzp <- pz(z, zp, r2, q, y, X, U, phi, Tn, k)
         z[j] <- sample(c(z[j], zp[j]), 1, prob = c(1, probzp))
+      } else {
+        log_p0 <- -(Tn / 2) * log(t(ytil) %*% ytil)
+        Xtil <- X[, j, drop = FALSE]
+        Wtil <- t(Xtil) %*% Xtil + 1 / g2
+        betatilhat <- solve(Wtil) %*% t(Xtil) %*% ytil
+        log_p1 <- log(q) - log(1 - q) - (1 / 2) * log(g2) - (Tn / 2) * log(t(ytil) %*% ytil - t(betatilhat) %*% Wtil %*% betatilhat)
+        z[j] <- sample(c(0, 1), 1, prob = exp(c(log_p0, log_p1)))
       }
       
     }
@@ -84,7 +92,7 @@ SaS <- function(X, y, U, S = 10000L, a = 1L, b = 1L, A = 1L, B = 1L){
     Wtil <- t(Xtil) %*% Xtil + diag(tauz) / g2
     betatilhat <- solve(Wtil) %*% t(Xtil) %*% ytil
     
-    sigma2 <- rinvgamma(1, Tn / 2, (t(ytil) %*% ytil - t(betatilhat) %*% (t(Xtil) %*% Xtil + diag(tauz) / g2) %*% betatilhat) / 2)
+    sigma2 <- rinvgamma(1, Tn / 2, (t(ytil) %*% ytil - t(betatilhat) %*% Wtil %*% betatilhat) / 2)
     
     # sample p(beta | y, phi, sigma2, r2, q, z)
     beta[1:k] <- 0
